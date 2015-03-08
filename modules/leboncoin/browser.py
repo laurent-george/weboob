@@ -25,8 +25,12 @@ from .pages import CityListPage, HousingListPage, HousingPage
 class LeboncoinBrowser(PagesBrowser):
     BASEURL = 'http://www.leboncoin.fr/'
     city = URL('ajax/location_list.html\?city=(?P<city>.*)&zipcode=(?P<zip>.*)', CityListPage)
-    search = URL('(?P<type>.*)/offres/(?P<region>.*)/occasions/\?ps=(?P<ps>.*)&pe=(?P<pe>.*)&ros=(?P<ros>.*)&location=(?P<location>.*)&sqs=(?P<sqs>.*)&sqe=(?P<sqe>.*)&ret=(?P<ret>.*)&f=(?P<advert_type>.*)',
-                 '(?P<_type>.*)/offres/(?P<_region>.*)/occasions.*?',
+    #search = URL('(?P<type>.*)/offres/(?P<region>.*)/paris/\?ps=(?P<ps>.*)&pe=(?P<pe>.*)&ros=(?P<ros>.*)&sqs=(?P<sqs>.*)&sqe=(?P<sqe>.*)&ret=(?P<ret>.*)&f=(?P<advert_type>.*)',
+    #             '(?P<_type>.*)/offres/(?P<_region>.*)',
+    #             HousingListPage)
+
+    search = URL('(?P<type>.*)/offres/(?P<region>.*)/\?ps=(?P<ps>.*)&pe=(?P<pe>.*)&ros=(?P<ros>.*)&sqs=(?P<sqs>.*)&sqe=(?P<sqe>.*)&ret=(?P<ret>.*)&f=(?P<advert_type>.*)&location=(?P<location>.*)',
+                 '(?P<_type>.*)/offres/(?P<_region>.*)',
                  HousingListPage)
     housing = URL('ventes_immobilieres/(?P<_id>.*).htm', HousingPage)
 
