@@ -59,7 +59,7 @@ class HousingPage(HTMLPage):
         obj_id = Env('_id')
         obj_title = CleanText('//meta[@itemprop="name"]/@content')
         obj_area = CleanDecimal(Regexp(CleanText('//meta[@itemprop="name"]/@content'),
-                                       '(.*?)(\d*) m\xb2(.*?)', '\\2'), default=NotAvailable)
+                                       '(.*?)(\d*) m\xb2(.*?)', '\\2', default=None), default=NotAvailable)
         obj_cost = CleanDecimal('//span[@itemprop="price"]')
         obj_currency = Regexp(CleanText('//span[@itemprop="price"]'),
                               '.*([%s%s%s])' % (u'€', u'$', u'£'), default=u'€')
@@ -113,7 +113,7 @@ class SearchPage(HTMLPage):
             obj_id = Format('%s-%s', Env('type'), CleanText('./div/header/@id', replace=[('header-offer-', '')]))
             obj_title = CleanText('./div/header/section/p[@class="property-type"]/span/@title')
             obj_area = CleanDecimal(Regexp(CleanText('./div/header/section/p[@class="property-type"]/span/@title'),
-                                           '(.*?)(\d*) m\xb2(.*?)', '\\2'), default=NotAvailable)
+                                           '(.*?)(\d*) m\xb2(.*?)', '\\2', default=None), default=NotAvailable)
             obj_cost = CleanDecimal(CleanText('./div/header/section/p[@class="price"]'),
                                     replace_dots=(',', '.'), default=Decimal(0))
             obj_currency = Regexp(CleanText('./div/header/section/p[@class="price"]'),
