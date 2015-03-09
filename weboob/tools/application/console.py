@@ -32,7 +32,7 @@ from weboob.capabilities.account import CapAccount, Account, AccountRegisterErro
 from weboob.core.backendscfg import BackendAlreadyExists
 from weboob.core.modules import ModuleLoadError
 from weboob.core.repositories import ModuleInstallError, IProgress
-from weboob.exceptions import BrowserUnavailable, BrowserIncorrectPassword, BrowserForbidden, BrowserSSLError
+from weboob.exceptions import BrowserUnavailable, BrowserIncorrectPassword, BrowserForbidden, BrowserSSLError, BrowserQuestion
 from weboob.tools.value import Value, ValueBool, ValueFloat, ValueInt, ValueBackendPassword
 from weboob.tools.misc import to_unicode
 from weboob.tools.ordereddict import OrderedDict
@@ -547,7 +547,12 @@ class ConsoleApplication(Application):
 
         This method can be overrided to support more exceptions types.
         """
-        if isinstance(error, BrowserIncorrectPassword):
+        if isinstance(error, BrowserQuestion):
+            for field in error.fields:
+                v = self.ask(field)
+                if v:
+                    backend.config[field.id].set(v)
+        elif isinstance(error, BrowserIncorrectPassword):
             msg = unicode(error)
             if not msg:
                 msg = 'invalid login/password.'

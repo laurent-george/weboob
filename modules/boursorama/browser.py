@@ -23,7 +23,7 @@
 import re
 from collections import defaultdict
 
-from weboob.deprecated.browser import Browser, BrowserIncorrectPassword
+from weboob.deprecated.browser import StateBrowser, BrowserIncorrectPassword
 from weboob.capabilities.bank import Account
 
 from .pages import (LoginPage, AccountsList, AccountHistory, CardHistory, UpdateInfoPage,
@@ -37,29 +37,31 @@ class BrowserIncorrectAuthenticationCode(BrowserIncorrectPassword):
     pass
 
 
-class Boursorama(Browser):
+class Boursorama(StateBrowser):
     DOMAIN = 'www.boursorama.com'
     PROTOCOL = 'https'
     CERTHASH = ['6bdf8b6dd177bd417ddcb1cfb818ede153288e44115eb269f2ddd458c8461039',
                 'b290ef629c88f0508e9cc6305421c173bd4291175e3ddedbee05ee666b34c20e']
     ENCODING = None  # refer to the HTML encoding
-    PAGES = {
-             '.*/connexion/securisation/index.phtml': AuthenticationPage,
-             '.*connexion.phtml.*': LoginPage,
-             '.*/comptes/synthese.phtml': AccountsList,
-             '.*/comptes/banque/detail/mouvements.phtml.*': AccountHistory,
-             '.*/comptes/banque/cartes/mouvements.phtml.*': CardHistory,
-             '.*/comptes/epargne/mouvements.phtml.*': AccountHistory,
-             '.*/date_anniversaire.phtml.*':    UpdateInfoPage,
-             '.*/detail.phtml.*': AccountInvestment,
-             '.*/opcvm.phtml.*': InvestmentDetail
+    PAGES = {r'.*/connexion/securisation.*': AuthenticationPage,
+             r'.*connexion.phtml.*': LoginPage,
+             r'.*/comptes/synthese.phtml': AccountsList,
+             r'.*/comptes/banque/detail/mouvements.phtml.*': AccountHistory,
+             r'.*/comptes/banque/cartes/mouvements.phtml.*': CardHistory,
+             r'.*/comptes/epargne/mouvements.phtml.*': AccountHistory,
+             r'.*/date_anniversaire.phtml.*':    UpdateInfoPage,
+             r'.*/detail.phtml.*': AccountInvestment,
+             r'.*/opcvm.phtml.*': InvestmentDetail
             }
 
-    def __init__(self, device="weboob", enable_twofactors=False,
-                 *args, **kwargs):
-        self.device = device
-        self.enable_twofactors = enable_twofactors
-        Browser.__init__(self, *args, **kwargs)
+    __states__ = ('auth_token',)
+
+    def __init__(self, config=None, *args, **kwargs):
+        self.config = config
+        self.auth_token = None
+        kwargs['username'] = self.config['login'].get()
+        kwargs['password'] = self.config['password'].get()
+        StateBrowser.__init__(self, *args, **kwargs)
 
     def home(self):
         if not self.is_logged():
@@ -72,41 +74,44 @@ class Boursorama(Browser):
 
     def handle_authentication(self):
         if self.is_on_page(AuthenticationPage):
-            if self.enable_twofactors:
-                self.page.authenticate(self.device)
+            if self.config['enable_twofactors'].get():
+                self.page.send_sms()
             else:
                 raise BrowserIncorrectAuthenticationCode(
                     """Boursorama - activate the two factor authentication in boursorama config."""
                     """ You will receive SMS code but are limited in request per day (around 15)"""
                 )
 
-
     def login(self):
-        assert isinstance(self.device, basestring)
-        assert isinstance(self.enable_twofactors, bool)
+        assert isinstance(self.config['device'].get(), basestring)
+        assert isinstance(self.config['enable_twofactors'].get(), bool)
         assert self.password.isdigit()
 
-        if not self.is_on_page(LoginPage):
-            self.location('https://' + self.DOMAIN + '/connexion.phtml', no_login=True)
+        if self.auth_token and self.config['pin_code'].get():
+            AuthenticationPage.authenticate(self)
+        else:
+            if not self.is_on_page(LoginPage):
+                self.location('https://' + self.DOMAIN + '/connexion.phtml', no_login=True)
 
-        self.page.login(self.username, self.password)
+            self.page.login(self.username, self.password)
 
-        if self.is_on_page(LoginPage):
-            raise BrowserIncorrectPassword()
+            if self.is_on_page(LoginPage):
+                raise BrowserIncorrectPassword()
 
-        #after login, we might be redirected to the two factor
-        #authentication page
-        #print "handle authentication"
-        self.handle_authentication()
+            #after login, we might be redirected to the two factor
+            #authentication page
+            self.handle_authentication()
 
         self.location('/comptes/synthese.phtml', no_login=True)
 
         #if the login was correct but authentication code failed,
         #we need to verify if bourso redirect us to login page or authentication page
         if self.is_on_page(LoginPage):
-            raise BrowserIncorrectAuthenticationCode()
+            raise BrowserIncorrectAuthenticationCode('Invalid PIN code')
 
     def get_accounts_list(self):
+        if self.is_on_page(AuthenticationPage):
+            self.login()
         if not self.is_on_page(AccountsList):
             self.location('/comptes/synthese.phtml')
 

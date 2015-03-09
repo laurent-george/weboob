@@ -33,6 +33,9 @@ class BasePage(_BasePage):
     def get_view_state(self):
         return self.document.xpath('//input[@name="javax.faces.ViewState"]')[0].attrib['value']
 
+    def is_password_expired(self):
+        return len(self.document.xpath('//div[@id="popup_client_modifier_code_confidentiel"]'))
+
 
 class UnavailablePage(BasePage):
     def on_loaded(self):
@@ -151,8 +154,10 @@ class AccountsPage(BasePage):
                         label = 'Unable to determine'
                     self.logger.warning('Unable to get account ID for %r' % label)
                     continue
-
-                account.id = args['paramNumCompte'] + args['paramNumContrat']
+                try:
+                    account.id = args['paramNumCompte'] + args['paramNumContrat']
+                except KeyError:
+                    account.id = args['paramNumCompte']
                 account_type_str = table.attrib['class'].split(' ')[-1][len('tableaux-comptes-'):]
                 account.type = self.ACCOUNT_TYPES.get(account_type_str, Account.TYPE_UNKNOWN)
 
