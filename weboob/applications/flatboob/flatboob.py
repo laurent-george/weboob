@@ -24,6 +24,7 @@ from weboob.tools.application.repl import ReplApplication, defaultcount
 from weboob.tools.application.formatters.iformatter import IFormatter, PrettyFormatter
 from weboob.tools.config.yamlconfig import YamlConfig
 
+import re
 
 __all__ = ['Flatboob']
 
@@ -90,21 +91,17 @@ class Flatboob(ReplApplication):
                         'housing':      HousingFormatter,
                        }
     COMMANDS_FORMATTERS = {'search': 'housing_list',
+                           'full_search': 'housing_list',
                            'info': 'housing',
-                           'load': 'housing_list'
+                           'load': 'housing_list',
+                           'load_full_search': 'housing_list'
                           }
 
     def main(self, argv):
         self.load_config(klass=YamlConfig)
         return ReplApplication.main(self, argv)
 
-    @defaultcount(10)
-    def do_search(self, line):
-        """
-        search
-
-        Search for housing. Parameters are interactively asked.
-        """
+    def _search(self, line):
         pattern = 'notempty'
         query = Query()
         query.cities = []
@@ -190,6 +187,17 @@ class Flatboob(ReplApplication):
 
             self.config.set('queries', name, query)
             self.config.save()
+        return query
+
+
+    @defaultcount(10)
+    def do_search(self, line):
+        """
+        search
+
+        Search for housing. Parameters are interactively asked.
+        """
+        query = self._search(line)
         self.complete_search(query)
 
     def complete_search(self, query):
@@ -204,13 +212,7 @@ class Flatboob(ReplApplication):
             return int(r)
         return None
 
-    @defaultcount(10)
-    def do_load(self, query_name):
-        """
-        load [query name]
-        without query name : list loadable queries
-        with query name laod query
-        """
+    def _load(self, query_name):
         queries = self.config.get('queries')
         if not queries:
             print('There is no saved queries', file=self.stderr)
@@ -224,10 +226,23 @@ class Flatboob(ReplApplication):
             query_name = self.ask('Which one')
 
         if query_name in queries:
-            self.complete_search(queries.get(query_name))
+            return queries.get(query_name)
         else:
             print('Unknown query', file=self.stderr)
-            return 2
+
+    @defaultcount(10)
+    def do_load(self, query_name):
+        """
+        load [query name]
+        without query name : list loadable queries
+        with query name laod query
+        """
+        query = self._load(query_name)
+        if query:
+            self.complete_search(query)
+        else:
+            return 2 # error code ??
+
 
     def complete_info(self, text, line, *ignored):
         args = line.split(' ')
@@ -251,3 +266,50 @@ class Flatboob(ReplApplication):
 
         self.start_format()
         self.format(housing)
+
+
+
+    def complete_full_search(self, query):
+        """
+        full search
+
+        On each found housing we do a get_housing
+        """
+
+        self.change_path([u'housings'])
+        self.start_format()
+        for housing in self.do('search_housings', query):
+            housing_full = self.get_object(housing.id, 'get_housing')
+            # we remove all multiple whitespace and end of line, because it hurt in csv file
+            housing_full.text = re.sub( '\s+', ' ', housing_full.text ).strip()
+            # we replace ; in text field by , to be csv safe
+            housing_full.text = housing_full.text.replace(';', ',')
+            #self.cached_format(housing_full)
+            self.format(housing_full)
+
+
+    def do_full_search(self, line):
+        """
+        full_search
+
+        Search all available information for housing. Parameters are interactively asked.
+        """
+        print('full search')
+        query = self._search(line)
+        self.complete_full_search(query)
+
+
+    @defaultcount(10)
+    def do_load_full_search(self, query_name):
+        """
+        load_full_search [query name]
+
+        without query name : list loadable queries
+        with query name load query
+        """
+        query = self._load(query_name)
+        if query:
+            self.complete_full_search(query)
+        else:
+            return 2 # error code ??
+
